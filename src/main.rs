@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "win32_pixel", allow(dead_code))]
+
 use std::io::{self, Write};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -643,7 +645,20 @@ impl PixelLayer {
         }
     }
 
-    #[cfg(feature = "pixel_tile")]
+    #[cfg(feature = "win32_pixel")]
+    fn bgra_word(&self, color: u8) -> u32 {
+        let (r, g, b) = self.palette[(color & 15) as usize];
+        (b as u32) << 16 | (g as u32) << 8 | r as u32
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    fn write_bgra(&self, out: &mut [u32]) {
+        for (dst, color) in out.iter_mut().zip(self.pixels.iter()) {
+            *dst = self.bgra_word(*color);
+        }
+    }
+
+    #[cfg(any(feature = "pixel_tile", feature = "win32_pixel"))]
     fn set_pixel(&mut self, x: usize, y: usize, color: u8) {
         if x < self.width && y < self.height {
             self.pixels[y * self.width + x] = color & 15;
@@ -712,6 +727,441 @@ impl PixelLayer {
             out.push('\n');
         }
         out
+    }
+}
+
+#[cfg(feature = "win32_pixel")]
+#[derive(Clone, Copy, Default)]
+struct ProbeInput {
+    left: bool,
+    right: bool,
+    up: bool,
+    down: bool,
+}
+
+#[cfg(feature = "win32_pixel")]
+fn render_win32_probe_frame(layer: &mut PixelLayer, frame: u32, input: ProbeInput) {
+    layer.clear(0);
+
+    for y in 0..layer.height {
+        for x in 0..layer.width {
+            let block = ((x / 8) + (y / 8)) & 1;
+            layer.set_pixel(x, y, if block == 0 { 1 } else { 2 });
+        }
+    }
+
+    const TILES: [[u8; 64]; 4] = [[4; 64], [5; 64], [6; 64], [10; 64]];
+    const MAP: [u8; 12] = [0, 1, 2, 3, 1, 2, 3, 0, 2, 3, 0, 1];
+    layer.draw_tilemap(16, 16, &MAP, 4, &TILES);
+
+    let mut sprite = [0u8; 256];
+    for y in 0..16 {
+        for x in 0..16 {
+            let edge = x == 0 || y == 0 || x == 15 || y == 15;
+            let core = (4..12).contains(&x) && (4..12).contains(&y);
+            sprite[y * 16 + x] = if edge {
+                7
+            } else if core {
+                15
+            } else {
+                0
+            };
+        }
+    }
+
+    let base_x = 72 + (frame as usize / 4 % 16);
+    let base_y = 60 + (frame as usize / 6 % 12);
+    let input_x = if input.right {
+        4
+    } else if input.left {
+        usize::MAX - 3
+    } else {
+        0
+    };
+    let input_y = if input.down {
+        4
+    } else if input.up {
+        usize::MAX - 3
+    } else {
+        0
+    };
+    let x = base_x.wrapping_add(input_x).min(layer.width - 16);
+    let y = base_y.wrapping_add(input_y).min(layer.height - 16);
+    layer.draw_sprite(x, y, &sprite, 0);
+}
+
+#[cfg(all(feature = "win32_pixel", windows))]
+mod win32_pixel {
+    use super::{render_win32_probe_frame, PixelLayer, ProbeInput};
+    use std::ffi::c_void;
+    use std::io;
+    use std::mem::{size_of, zeroed};
+    use std::ptr::{null, null_mut};
+
+    type Hinstance = *mut c_void;
+    type Hwnd = *mut c_void;
+    type Hdc = *mut c_void;
+    type Hicon = *mut c_void;
+    type Hcursor = *mut c_void;
+    type Hbrush = *mut c_void;
+    type Lpcwstr = *const u16;
+    type Lparam = isize;
+    type Wparam = usize;
+    type Lresult = isize;
+    type Uint = u32;
+    type Dword = u32;
+    type Long = i32;
+    type Bool = i32;
+
+    const WIDTH: usize = 160;
+    const HEIGHT: usize = 144;
+    const SCALE: i32 = 4;
+    const TIMER_ID: usize = 1;
+    const TIMER_MS: u32 = 16;
+
+    const CS_VREDRAW: Uint = 0x0001;
+    const CS_HREDRAW: Uint = 0x0002;
+    const CW_USEDEFAULT: i32 = 0x8000_0000u32 as i32;
+    const WS_OVERLAPPEDWINDOW: Dword = 0x00cf_0000;
+    const WS_VISIBLE: Dword = 0x1000_0000;
+    const SW_SHOW: i32 = 5;
+
+    const WM_DESTROY: Uint = 0x0002;
+    const WM_PAINT: Uint = 0x000f;
+    const WM_CLOSE: Uint = 0x0010;
+    const WM_KEYDOWN: Uint = 0x0100;
+    const WM_KEYUP: Uint = 0x0101;
+    const WM_TIMER: Uint = 0x0113;
+
+    const VK_ESCAPE: Wparam = 0x1b;
+    const VK_LEFT: Wparam = 0x25;
+    const VK_UP: Wparam = 0x26;
+    const VK_RIGHT: Wparam = 0x27;
+    const VK_DOWN: Wparam = 0x28;
+
+    const BI_RGB: Dword = 0;
+    const DIB_RGB_COLORS: Uint = 0;
+    const SRCCOPY: Dword = 0x00cc_0020;
+
+    #[repr(C)]
+    struct WndClassW {
+        style: Uint,
+        lpfn_wnd_proc: Option<unsafe extern "system" fn(Hwnd, Uint, Wparam, Lparam) -> Lresult>,
+        cb_cls_extra: i32,
+        cb_wnd_extra: i32,
+        h_instance: Hinstance,
+        h_icon: Hicon,
+        h_cursor: Hcursor,
+        hbr_background: Hbrush,
+        lpsz_menu_name: Lpcwstr,
+        lpsz_class_name: Lpcwstr,
+    }
+
+    #[repr(C)]
+    struct Point {
+        x: Long,
+        y: Long,
+    }
+
+    #[repr(C)]
+    struct Msg {
+        hwnd: Hwnd,
+        message: Uint,
+        w_param: Wparam,
+        l_param: Lparam,
+        time: Dword,
+        pt: Point,
+    }
+
+    #[repr(C)]
+    struct Rect {
+        left: Long,
+        top: Long,
+        right: Long,
+        bottom: Long,
+    }
+
+    #[repr(C)]
+    struct PaintStruct {
+        hdc: Hdc,
+        f_erase: Bool,
+        rc_paint: Rect,
+        f_restore: Bool,
+        f_inc_update: Bool,
+        rgb_reserved: [u8; 32],
+    }
+
+    #[repr(C)]
+    struct BitmapInfoHeader {
+        bi_size: Dword,
+        bi_width: Long,
+        bi_height: Long,
+        bi_planes: u16,
+        bi_bit_count: u16,
+        bi_compression: Dword,
+        bi_size_image: Dword,
+        bi_x_pels_per_meter: Long,
+        bi_y_pels_per_meter: Long,
+        bi_clr_used: Dword,
+        bi_clr_important: Dword,
+    }
+
+    #[repr(C)]
+    struct RgbQuad {
+        rgb_blue: u8,
+        rgb_green: u8,
+        rgb_red: u8,
+        rgb_reserved: u8,
+    }
+
+    #[repr(C)]
+    struct BitmapInfo {
+        bmi_header: BitmapInfoHeader,
+        bmi_colors: [RgbQuad; 1],
+    }
+
+    struct ProbeWindow {
+        layer: PixelLayer,
+        bgra: Vec<u32>,
+        input: ProbeInput,
+        frame: u32,
+    }
+
+    impl ProbeWindow {
+        fn new() -> Self {
+            Self {
+                layer: PixelLayer::new(WIDTH, HEIGHT),
+                bgra: vec![0; WIDTH * HEIGHT],
+                input: ProbeInput::default(),
+                frame: 0,
+            }
+        }
+
+        fn update(&mut self) {
+            render_win32_probe_frame(&mut self.layer, self.frame, self.input);
+            self.layer.write_bgra(&mut self.bgra);
+            self.frame = self.frame.wrapping_add(1);
+        }
+    }
+
+    static mut PROBE_WINDOW: *mut ProbeWindow = null_mut();
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn RegisterClassW(lp_wnd_class: *const WndClassW) -> u16;
+        fn CreateWindowExW(
+            dw_ex_style: Dword,
+            lp_class_name: Lpcwstr,
+            lp_window_name: Lpcwstr,
+            dw_style: Dword,
+            x: i32,
+            y: i32,
+            n_width: i32,
+            n_height: i32,
+            h_wnd_parent: Hwnd,
+            h_menu: *mut c_void,
+            h_instance: Hinstance,
+            lp_param: *mut c_void,
+        ) -> Hwnd;
+        fn DefWindowProcW(hwnd: Hwnd, msg: Uint, w_param: Wparam, l_param: Lparam) -> Lresult;
+        fn DestroyWindow(hwnd: Hwnd) -> Bool;
+        fn DispatchMessageW(lp_msg: *const Msg) -> Lresult;
+        fn GetMessageW(lp_msg: *mut Msg, hwnd: Hwnd, min: Uint, max: Uint) -> Bool;
+        fn GetModuleHandleW(lp_module_name: Lpcwstr) -> Hinstance;
+        fn InvalidateRect(hwnd: Hwnd, rect: *const Rect, erase: Bool) -> Bool;
+        fn LoadCursorW(h_instance: Hinstance, lp_cursor_name: Lpcwstr) -> Hcursor;
+        fn PostQuitMessage(exit_code: i32);
+        fn SetTimer(hwnd: Hwnd, id_event: usize, elapse: Uint, timer_func: *mut c_void) -> usize;
+        fn ShowWindow(hwnd: Hwnd, n_cmd_show: i32) -> Bool;
+        fn TranslateMessage(lp_msg: *const Msg) -> Bool;
+        fn UpdateWindow(hwnd: Hwnd) -> Bool;
+    }
+
+    #[link(name = "gdi32")]
+    extern "system" {
+        fn BeginPaint(hwnd: Hwnd, lp_paint: *mut PaintStruct) -> Hdc;
+        fn EndPaint(hwnd: Hwnd, lp_paint: *const PaintStruct) -> Bool;
+        fn StretchDIBits(
+            hdc: Hdc,
+            x_dest: i32,
+            y_dest: i32,
+            dest_width: i32,
+            dest_height: i32,
+            x_src: i32,
+            y_src: i32,
+            src_width: i32,
+            src_height: i32,
+            bits: *const c_void,
+            bmi: *const BitmapInfo,
+            usage: Uint,
+            rop: Dword,
+        ) -> i32;
+    }
+
+    pub fn run() -> io::Result<()> {
+        let class_name = wide("MadoCore144Win32PixelProbe");
+        let title = wide("MadoCore 144 v0.6 Win32 Pixel Probe");
+        let mut state = Box::new(ProbeWindow::new());
+        state.update();
+
+        unsafe {
+            PROBE_WINDOW = state.as_mut();
+            let instance = GetModuleHandleW(null());
+            let class = WndClassW {
+                style: CS_HREDRAW | CS_VREDRAW,
+                lpfn_wnd_proc: Some(window_proc),
+                cb_cls_extra: 0,
+                cb_wnd_extra: 0,
+                h_instance: instance,
+                h_icon: null_mut(),
+                h_cursor: LoadCursorW(null_mut(), 32512usize as Lpcwstr),
+                hbr_background: null_mut(),
+                lpsz_menu_name: null(),
+                lpsz_class_name: class_name.as_ptr(),
+            };
+
+            if RegisterClassW(&class) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+
+            let hwnd = CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                title.as_ptr(),
+                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                CW_USEDEFAULT,
+                CW_USEDEFAULT,
+                WIDTH as i32 * SCALE + 16,
+                HEIGHT as i32 * SCALE + 39,
+                null_mut(),
+                null_mut(),
+                instance,
+                null_mut(),
+            );
+            if hwnd.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+
+            SetTimer(hwnd, TIMER_ID, TIMER_MS, null_mut());
+            ShowWindow(hwnd, SW_SHOW);
+            UpdateWindow(hwnd);
+
+            let mut msg: Msg = zeroed();
+            while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+            PROBE_WINDOW = null_mut();
+        }
+
+        Ok(())
+    }
+
+    unsafe extern "system" fn window_proc(
+        hwnd: Hwnd,
+        msg: Uint,
+        w_param: Wparam,
+        l_param: Lparam,
+    ) -> Lresult {
+        match msg {
+            WM_CLOSE => {
+                DestroyWindow(hwnd);
+                0
+            }
+            WM_DESTROY => {
+                PostQuitMessage(0);
+                0
+            }
+            WM_KEYDOWN | WM_KEYUP => {
+                if w_param == VK_ESCAPE && msg == WM_KEYDOWN {
+                    DestroyWindow(hwnd);
+                    return 0;
+                }
+                if let Some(state) = PROBE_WINDOW.as_mut() {
+                    let pressed = msg == WM_KEYDOWN;
+                    match w_param {
+                        VK_LEFT => state.input.left = pressed,
+                        VK_RIGHT => state.input.right = pressed,
+                        VK_UP => state.input.up = pressed,
+                        VK_DOWN => state.input.down = pressed,
+                        _ => {}
+                    }
+                }
+                0
+            }
+            WM_TIMER => {
+                if let Some(state) = PROBE_WINDOW.as_mut() {
+                    state.update();
+                }
+                InvalidateRect(hwnd, null(), 0);
+                0
+            }
+            WM_PAINT => {
+                let mut ps: PaintStruct = zeroed();
+                let hdc = BeginPaint(hwnd, &mut ps);
+                if let Some(state) = PROBE_WINDOW.as_mut() {
+                    let bmi = bitmap_info();
+                    StretchDIBits(
+                        hdc,
+                        0,
+                        0,
+                        WIDTH as i32 * SCALE,
+                        HEIGHT as i32 * SCALE,
+                        0,
+                        0,
+                        WIDTH as i32,
+                        HEIGHT as i32,
+                        state.bgra.as_ptr().cast(),
+                        &bmi,
+                        DIB_RGB_COLORS,
+                        SRCCOPY,
+                    );
+                }
+                EndPaint(hwnd, &ps);
+                0
+            }
+            _ => DefWindowProcW(hwnd, msg, w_param, l_param),
+        }
+    }
+
+    fn bitmap_info() -> BitmapInfo {
+        BitmapInfo {
+            bmi_header: BitmapInfoHeader {
+                bi_size: size_of::<BitmapInfoHeader>() as Dword,
+                bi_width: WIDTH as Long,
+                bi_height: -(HEIGHT as Long),
+                bi_planes: 1,
+                bi_bit_count: 32,
+                bi_compression: BI_RGB,
+                bi_size_image: (WIDTH * HEIGHT * 4) as Dword,
+                bi_x_pels_per_meter: 0,
+                bi_y_pels_per_meter: 0,
+                bi_clr_used: 0,
+                bi_clr_important: 0,
+            },
+            bmi_colors: [RgbQuad {
+                rgb_blue: 0,
+                rgb_green: 0,
+                rgb_red: 0,
+                rgb_reserved: 0,
+            }],
+        }
+    }
+
+    fn wide(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain([0]).collect()
+    }
+}
+
+#[cfg(all(feature = "win32_pixel", not(windows)))]
+mod win32_pixel {
+    use std::io;
+
+    pub fn run() -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "win32_pixel requires Windows",
+        ))
     }
 }
 
@@ -1286,7 +1736,18 @@ fn print_screen(screen: &Screen) -> io::Result<()> {
     out.flush()
 }
 
+#[cfg(not(feature = "win32_pixel"))]
 fn main() -> io::Result<()> {
+    run_terminal_game()
+}
+
+#[cfg(feature = "win32_pixel")]
+fn main() -> io::Result<()> {
+    win32_pixel::run()
+}
+
+#[cfg(not(feature = "win32_pixel"))]
+fn run_terminal_game() -> io::Result<()> {
     let mut game = GameState::new(demo_stages());
     let mut screen = Screen::new(42, 16);
     let mut pixels = PixelLayer::new(160, 144);
@@ -1738,6 +2199,42 @@ mod tests {
             assert!(!stage.meta.gimmick.is_empty());
             assert_eq!(stage.meta.goal_type, GoalType::Reach);
         }
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn pixel_palette_converts_to_bgra_words() {
+        let layer = PixelLayer::new(2, 1);
+        assert_eq!(layer.bgra_word(0), 0x0018_120f);
+        assert_eq!(layer.bgra_word(15), 0x00f8_f8f8);
+        assert_eq!(layer.bgra_word(31), 0x00f8_f8f8);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn win32_probe_frame_draws_checker_tiles_and_sprite() {
+        let mut layer = PixelLayer::new(160, 144);
+        render_win32_probe_frame(&mut layer, 0, ProbeInput::default());
+        assert_eq!(layer.pixel(0, 0), 1);
+        assert_eq!(layer.pixel(8, 0), 2);
+        assert_eq!(layer.pixel(24, 24), 6);
+        assert_eq!(layer.pixel(78, 66), 15);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn win32_probe_arrow_input_moves_sprite() {
+        let mut layer = PixelLayer::new(160, 144);
+        render_win32_probe_frame(
+            &mut layer,
+            0,
+            ProbeInput {
+                right: true,
+                down: true,
+                ..ProbeInput::default()
+            },
+        );
+        assert_eq!(layer.pixel(82, 70), 15);
     }
 
     #[cfg(feature = "pixel_tile")]

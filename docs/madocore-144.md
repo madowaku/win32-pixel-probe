@@ -1,5 +1,14 @@
 # MadoCore 144 Notes
 
+## Repository Split
+
+This repository is now `win32-pixel-probe`, a separate experiment space born from MadoCore 144. The split keeps the project roles clear:
+
+- `madowaku/madocore144`: stable 1.44 MB game core, Stage Pack, Rule Hooks, and FIRST WINDOW terminal build.
+- `madowaku/win32-pixel-probe`: no-crate Win32 FFI, `StretchDIBits`, `PixelLayer` display, and input experiments.
+
+The probe can be treated as a tiny Win32 game template if it keeps its size and code shape. Later, stable pieces can be reverse-imported into MadoCore as a feature, spun into a `madocore144-pixel` branch, or kept here as an independent tool.
+
 ## Purpose
 
 MadoCore 144 is a compact game core for making Rust games that fit under a 1.44 MB contest limit. The first target is a Windows terminal executable with no external crates and no external assets.
@@ -97,6 +106,35 @@ The game contains 20 one-screen stages:
 - 09-13: ice puzzles.
 - 14-17: trap puzzles.
 - 18-20: finale stages that reuse the same single-rule hook model.
+
+## v0.6 Win32 Pixel Probe
+
+The Win32 Pixel Probe is an experiment branch for proving that the existing `PixelLayer` can reach a native Windows window without external crates. It is not a FIRST WINDOW port yet.
+
+Build selection:
+
+- Normal builds keep the terminal game loop.
+- `--features win32_pixel` changes `main()` to a Windows pixel-window demo.
+- The feature depends on `pixel_tile` so the existing tilemap and sprite drawing helpers remain the shared drawing surface.
+
+Rendering path:
+
+- A 160x144 `PixelLayer` stores 4-bit palette indices in a `u8` buffer.
+- The demo frame draws a checker background, a small 8x8 tilemap, and one 16x16 sprite.
+- The palette converter expands each index to a `u32` BGRA word.
+- The Win32 paint handler calls `StretchDIBits` with a top-down 32-bit DIB and scales the layer to 4x.
+
+Win32 boundary:
+
+- The handwritten FFI lives in a small `win32_pixel` module in `src/main.rs`.
+- It calls `RegisterClassW`, `CreateWindowExW`, `GetMessageW`, `DispatchMessageW`, `BeginPaint`, `EndPaint`, and `StretchDIBits`.
+- Esc and the window close button exit. Arrow key state is tracked and nudges the demo sprite.
+
+Risk notes:
+
+- `unsafe` is isolated to the FFI module and one single-window state pointer.
+- The terminal game remains the stable path if the window experiment becomes too complex.
+- The next decision should be based on release size, code readability, and whether FIRST WINDOW can reuse this path without turning the core into a Win32 framework.
 
 ## Size Strategy
 

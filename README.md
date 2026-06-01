@@ -1,8 +1,43 @@
-# MadoCore 144
+# win32-pixel-probe
+
+win32-pixel-probe is an experimental no-crate Rust Win32 pixel window for tiny games.
+
+It was born from MadoCore 144, but is kept separate so unsafe Win32 FFI experiments do not disturb the stable terminal game core.
+
+Japanese note:
+
+```text
+win32-pixel-probe は、MadoCore 144から派生した
+外部crateなしWin32ピクセル窓の実験場です。
+安定した端末版コアとは分けて、FFIや描画まわりを自由に試します。
+```
+
+This repo is the "romance lab" side of the split:
+
+```text
+madowaku/madocore144
+  Stable tiny game core, Stage Pack, Rule Hooks, FIRST WINDOW terminal build.
+
+madowaku/win32-pixel-probe
+  Experiment space for no-crate Win32 FFI, StretchDIBits, PixelLayer display, and input checks.
+```
+
+## Probe Result
+
+The first probe is a success:
+
+```text
+Win32 Pixel Probe
+112,640 bytes
+7.64%
+Remaining: 1,361,920 bytes
+```
+
+That means a native Win32 pixel window is comfortably inside the 1.44 MB target. This project can now grow as a small Win32 game template without forcing `unsafe` FFI into the stable MadoCore terminal repo.
+
+## MadoCore Origin
 
 MadoCore 144 is a tiny Rust game core for 1.44 MB game contests. It is not a Unity, Godot, Defold, or GDevelop replacement. It is a small starting point for single-file executable games that keep stages, pixel data, and sound data in code.
-
-## FIRST WINDOW
 
 FIRST WINDOW is the first complete puzzle game built with MadoCore 144.
 
@@ -27,6 +62,8 @@ Concept: inside a tiny 1.44 MB window, read keys, ice, and traps, then reach the
 - v0.2 Pixel Layer skeleton: 160x144 indexed buffer, 16-color palette, 8x8 tile draw, 16x16 sprite draw, tilemap draw, compact square-wave/MML-style sound data.
 - v0.4 Stage Pack metadata: stage id, name, goal type, turn limit, hint, gimmick label, and per-stage tile meanings.
 - v0.5 Rule Hooks: compact `classic`, `keydoor`, `ice`, and `trap` rule sets.
+- v0.6 Win32 Pixel Probe: feature-gated no-crate Win32 window path for the 160x144 Pixel Layer.
+- Package name and release exe are `win32-pixel-probe`.
 
 ## Controls
 
@@ -46,12 +83,21 @@ Run the game and type a command, then press Enter.
 cargo fmt
 cargo test
 cargo build --release
+cargo build --release --features win32_pixel
 ```
+
+To run the experimental Win32 pixel window:
+
+```powershell
+cargo run --release --features win32_pixel
+```
+
+Use Esc or the window close button to quit. Arrow keys move the demo sprite.
 
 ## Size Check
 
 ```powershell
-(Get-Item .\target\release\madocore144.exe).Length
+(Get-Item .\target\release\win32-pixel-probe.exe).Length
 ```
 
 For v0.3 capacity measurements:
@@ -114,6 +160,14 @@ FIRST WINDOW v0.1 size log:
 | `asset_maps` | `138,752 bytes` | `1,335,808 bytes` | `9.41%` |
 | `asset_sound` | `136,192 bytes` | `1,338,368 bytes` | `9.24%` |
 | FIRST WINDOW default all capacity assets | `147,456 bytes` | `1,327,104 bytes` | `10.00%` |
+
+MadoCore 144 v0.6 Win32 Pixel Probe size log:
+
+| Case | Release exe size | Remaining | Used |
+| --- | ---: | ---: | ---: |
+| v0.6 Win32 Pixel Probe (`--features win32_pixel`) | `112,640 bytes` | `1,361,920 bytes` | `7.64%` |
+
+The probe is an experiment, not the FIRST WINDOW game port. It keeps the terminal game as the normal build and switches to a native Win32 window only when the `win32_pixel` feature is enabled. The window path uses Rust standard library plus handwritten FFI to `user32.dll` and `gdi32.dll`, creates a 160x144 indexed `PixelLayer`, converts the 16-color palette to 32-bit BGRA, and presents it with `StretchDIBits` at 4x scale. The demo draws a checker background, a few 8x8 tiles, and a moving sprite.
 
 ## Stage Pack Format
 

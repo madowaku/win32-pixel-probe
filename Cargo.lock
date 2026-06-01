@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "madocore144"
+name = "win32-pixel-probe"
 version = "0.1.0"

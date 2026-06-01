@@ -1,5 +1,5 @@
 [package]
-name = "madocore144"
+name = "win32-pixel-probe"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,6 +18,7 @@ asset_tiles = ["pixel_tile"]
 asset_sprites = ["pixel_tile"]
 asset_maps = ["pixel_tile"]
 asset_sound = ["pixel_sound"]
+win32_pixel = ["pixel_tile"]
 
 [profile.release]
 opt-level = "z"

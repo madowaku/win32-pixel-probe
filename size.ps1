@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $limit = 1474560
-$exe = Join-Path $PSScriptRoot "target\release\madocore144.exe"
+$exe = Join-Path $PSScriptRoot "target\release\win32-pixel-probe.exe"
 
 $cases = @(
     @{
@@ -27,6 +27,10 @@ $cases = @(
     @{
         Name = "first_window_v0_1_default_all_assets"
         Args = @("build", "--release")
+    },
+    @{
+        Name = "v0_6_win32_pixel_probe"
+        Args = @("build", "--release", "--features", "win32_pixel")
     }
 )
 
