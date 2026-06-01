@@ -916,29 +916,55 @@ fn capacity_demo_checksum() -> u64 {
 const STAGES: &[&[&str]] = &[
     &[
         "@stage 01",
-        "@name First Window",
+        "@name First Step",
         "@goal reach",
         "@rules classic",
-        "@limit 40",
-        "@hint The shortest path is not always the best.",
-        "@gimmick classic",
-        "@tile x wall",
+        "@limit 12",
+        "@hint Walk straight to the window.",
+        "@gimmick warmup",
+        "",
+        "#######",
+        "#P...G#",
+        "#######",
+    ],
+    &[
+        "@stage 02",
+        "@name Corner Light",
+        "@goal reach",
+        "@rules classic",
+        "@limit 16",
+        "@hint Turn once, then keep going.",
+        "@gimmick corner",
+        "",
+        "#######",
+        "#P....#",
+        "####..#",
+        "#G....#",
+        "#######",
+    ],
+    &[
+        "@stage 03",
+        "@name Quiet Wall",
+        "@goal reach",
+        "@rules classic",
+        "@limit 20",
+        "@hint The wall teaches the route.",
+        "@gimmick wall-read",
         "",
         "########",
-        "#P....G#",
-        "#..##..#",
+        "#P..#G.#",
+        "#...#..#",
         "#......#",
         "########",
     ],
     &[
-        "@stage 02",
-        "@name Narrow Key",
+        "@stage 04",
+        "@name First Window",
         "@goal reach",
         "@rules classic",
-        "@limit 32",
-        "@hint Count corners before you commit.",
-        "@gimmick narrow",
-        "@tile ~ floor",
+        "@limit 24",
+        "@hint The shortest-looking path is closed.",
+        "@gimmick detour",
         "",
         "#########",
         "#P..#...#",
@@ -947,117 +973,257 @@ const STAGES: &[&[&str]] = &[
         "#########",
     ],
     &[
-        "@stage 03",
-        "@name Long Hall",
-        "@goal reach",
-        "@rules classic",
-        "@limit 28",
-        "@hint The wall is a ruler.",
-        "@gimmick long-hall",
-        "@tile x wall",
-        "",
-        "##########",
-        "#P.......#",
-        "#.######.#",
-        "#......#G#",
-        "##########",
-    ],
-    &[
-        "@stage 04",
-        "@name Back Step",
-        "@goal reach",
-        "@rules classic",
-        "@limit 34",
-        "@hint Undo is part of the toolkit.",
-        "@gimmick backtrack",
-        "@tile x wall",
-        "",
-        "##########",
-        "#P..#....#",
-        "#.#.#.##G#",
-        "#...#....#",
-        "##########",
-    ],
-    &[
         "@stage 05",
-        "@name Last Pane",
-        "@goal reach",
-        "@rules classic",
-        "@limit 38",
-        "@hint A small detour opens the window.",
-        "@gimmick final",
-        "@tile x wall",
-        "",
-        "###########",
-        "#P....#...#",
-        "###.#.#.#G#",
-        "#...#.....#",
-        "###########",
-    ],
-    &[
-        "@stage 06",
         "@name Brass Key",
         "@goal reach",
         "@rules keydoor",
-        "@limit 36",
-        "@hint Take K before pushing through D.",
+        "@limit 18",
+        "@hint Take K, then open D.",
         "@gimmick keydoor",
         "@tile K key",
         "@tile D door",
         "",
-        "###########",
-        "#P.K.D..G#",
-        "#.#####..#",
-        "#........#",
-        "###########",
+        "#########",
+        "#P.K.D.G#",
+        "#########",
+    ],
+    &[
+        "@stage 06",
+        "@name Locked Bend",
+        "@goal reach",
+        "@rules keydoor",
+        "@limit 24",
+        "@hint The door waits after the bend.",
+        "@gimmick keydoor",
+        "@tile K key",
+        "@tile D door",
+        "",
+        "##########",
+        "#P..D...G#",
+        "#.####.#.#",
+        "#K.....#.#",
+        "##########",
     ],
     &[
         "@stage 07",
-        "@name Cold Pane",
+        "@name Spare Key",
         "@goal reach",
-        "@rules ice",
-        "@limit 18",
-        "@hint Step on I and commit to the slide.",
-        "@gimmick ice",
-        "@tile I ice",
+        "@rules keydoor",
+        "@limit 28",
+        "@hint The key is not on the direct line.",
+        "@gimmick side-key",
+        "@tile K key",
+        "@tile D door",
         "",
-        "###########",
-        "#PII....G#",
-        "#.#####..#",
-        "#........#",
-        "###########",
+        "##########",
+        "#P....D.G#",
+        "#.####...#",
+        "#K.......#",
+        "##########",
     ],
     &[
         "@stage 08",
+        "@name Double Lock",
+        "@goal reach",
+        "@rules keydoor",
+        "@limit 32",
+        "@hint One key opens every D.",
+        "@gimmick double-door",
+        "@tile K key",
+        "@tile D door",
+        "",
+        "###########",
+        "#P.K.D.DG#",
+        "#.......##",
+        "##########",
+    ],
+    &[
+        "@stage 09",
+        "@name Cold Pane",
+        "@goal reach",
+        "@rules ice",
+        "@limit 10",
+        "@hint I slides until the wall says stop.",
+        "@gimmick ice",
+        "@tile I ice",
+        "",
+        "########",
+        "#PII..G#",
+        "########",
+    ],
+    &[
+        "@stage 10",
+        "@name North Wind",
+        "@goal reach",
+        "@rules ice",
+        "@limit 14",
+        "@hint Approach the ice from below.",
+        "@gimmick ice-turn",
+        "@tile I ice",
+        "",
+        "########",
+        "#....G.#",
+        "#.####.#",
+        "#P.I...#",
+        "########",
+    ],
+    &[
+        "@stage 11",
+        "@name Long Slide",
+        "@goal reach",
+        "@rules ice",
+        "@limit 16",
+        "@hint The slide is longer than it looks.",
+        "@gimmick long-ice",
+        "@tile I ice",
+        "",
+        "##########",
+        "#PIIII..G#",
+        "#........#",
+        "##########",
+    ],
+    &[
+        "@stage 12",
+        "@name Ice Pocket",
+        "@goal reach",
+        "@rules ice",
+        "@limit 18",
+        "@hint Stop at the pocket, then turn.",
+        "@gimmick pocket",
+        "@tile I ice",
+        "",
+        "##########",
+        "#P.I....G#",
+        "#..###...#",
+        "#........#",
+        "##########",
+    ],
+    &[
+        "@stage 13",
+        "@name Last Frost",
+        "@goal reach",
+        "@rules ice",
+        "@limit 20",
+        "@hint Use the lower lane to aim the slide.",
+        "@gimmick aim",
+        "@tile I ice",
+        "",
+        "###########",
+        "#P..#....G#",
+        "#...#I....#",
+        "#.........#",
+        "###########",
+    ],
+    &[
+        "@stage 14",
         "@name Red Floor",
         "@goal reach",
         "@rules trap",
-        "@limit 30",
+        "@limit 14",
         "@hint T ends the run.",
         "@gimmick trap",
         "@tile T trap",
         "",
-        "###########",
-        "#P..T...G#",
-        "#.#####..#",
+        "########",
+        "#P.T.G#",
+        "#.....#",
+        "########",
+    ],
+    &[
+        "@stage 15",
+        "@name Safe Edge",
+        "@goal reach",
+        "@rules trap",
+        "@limit 18",
+        "@hint The edge is safer than the center.",
+        "@gimmick edge",
+        "@tile T trap",
+        "",
+        "#########",
+        "#P..T..G#",
+        "#.......#",
+        "#########",
+    ],
+    &[
+        "@stage 16",
+        "@name Red Cross",
+        "@goal reach",
+        "@rules trap",
+        "@limit 22",
+        "@hint Read the red cross before moving.",
+        "@gimmick cross",
+        "@tile T trap",
+        "",
+        "##########",
+        "#P...T..G#",
+        "#..TTT...#",
         "#........#",
+        "##########",
+    ],
+    &[
+        "@stage 17",
+        "@name Last Trap",
+        "@goal reach",
+        "@rules trap",
+        "@limit 24",
+        "@hint There is room around the danger.",
+        "@gimmick bypass",
+        "@tile T trap",
+        "",
+        "###########",
+        "#P..T....G#",
+        "#.#####...#",
+        "#.........#",
         "###########",
     ],
     &[
-        "@stage 09",
-        "@name Rule Gallery",
+        "@stage 18",
+        "@name Memory Key",
         "@goal reach",
         "@rules keydoor",
-        "@limit 42",
-        "@hint This one is a tiny rule showcase.",
-        "@gimmick mixed",
+        "@limit 34",
+        "@hint It feels mixed, but the key still rules.",
+        "@gimmick finale-key",
         "@tile K key",
         "@tile D door",
-        "@tile x wall",
+        "@tile T wall",
         "",
         "############",
-        "#P.K.xD..G#",
-        "#..x......#",
+        "#P.K..T.DG#",
+        "#...TTT...#",
+        "#.........#",
+        "############",
+    ],
+    &[
+        "@stage 19",
+        "@name Memory Ice",
+        "@goal reach",
+        "@rules ice",
+        "@limit 26",
+        "@hint The old window trick returns as ice.",
+        "@gimmick finale-ice",
+        "@tile I ice",
+        "@tile T wall",
+        "",
+        "############",
+        "#P.I..T..G#",
+        "#...TTT...#",
+        "#.........#",
+        "############",
+    ],
+    &[
+        "@stage 20",
+        "@name Final Window",
+        "@goal reach",
+        "@rules trap",
+        "@limit 30",
+        "@hint One calm path remains.",
+        "@gimmick finale-trap",
+        "@tile T trap",
+        "",
+        "############",
+        "#P..T....G#",
+        "#.TTT.TTT.#",
         "#.........#",
         "############",
     ],
@@ -1091,18 +1257,21 @@ fn draw_scene(screen: &mut Screen, game: &GameState) {
     screen.frame();
     match game.scene {
         Scene::Title => {
-            screen.text(3, 2, "MadoCore 144");
-            screen.text(3, 4, "Enter: start  H: help  Q: quit");
+            screen.text(3, 2, "FIRST WINDOW");
+            screen.text(3, 4, "A 1.44MB puzzle made with MadoCore 144");
+            screen.text(3, 6, "Enter: start  H: help  Q: quit");
         }
         Scene::Help => {
-            screen.text(3, 2, "WASD/arrows: move");
-            screen.text(3, 3, "U: undo  R: reset  Esc/Q: quit");
-            screen.text(3, 5, "Reach G in all 9 packed stages.");
+            screen.text(3, 2, "Reach G in 20 one-screen puzzles.");
+            screen.text(3, 3, "K opens D. I slides. T ends the run.");
+            screen.text(3, 4, "WASD/arrows: move  U: undo  R: reset");
+            screen.text(3, 5, "Enter: start  Q/Esc: quit");
         }
         Scene::Game => screen.draw_game(game),
         Scene::Clear => {
-            screen.text(3, 2, "All stages clear!");
-            screen.text(3, 4, "Q: quit  R: restart");
+            screen.text(3, 2, "The first window opens.");
+            screen.text(3, 4, "You carried the light through every pane.");
+            screen.text(3, 6, "Q: quit  R: restart");
         }
         Scene::GameOver => {
             screen.text(3, 2, "Game over");
@@ -1535,14 +1704,40 @@ mod tests {
     }
 
     #[test]
-    fn demo_uses_nine_stage_pack_entries_with_rule_examples() {
+    fn first_window_has_twenty_stage_pack_entries() {
         let stages = demo_stages();
-        assert_eq!(stages.len(), 9);
+        assert_eq!(stages.len(), 20);
         assert_eq!(stages[0].meta.id, "01");
-        assert_eq!(stages[4].meta.name, "Last Pane");
-        assert_eq!(stages[5].meta.rule_set, RuleSet::KeyDoor);
-        assert_eq!(stages[6].meta.rule_set, RuleSet::Ice);
-        assert_eq!(stages[7].meta.rule_set, RuleSet::Trap);
+        assert_eq!(stages[19].meta.name, "Final Window");
+    }
+
+    #[test]
+    fn first_window_contains_all_rule_sets() {
+        let stages = demo_stages();
+        assert!(stages
+            .iter()
+            .any(|stage| stage.meta.rule_set == RuleSet::Classic));
+        assert!(stages
+            .iter()
+            .any(|stage| stage.meta.rule_set == RuleSet::KeyDoor));
+        assert!(stages
+            .iter()
+            .any(|stage| stage.meta.rule_set == RuleSet::Ice));
+        assert!(stages
+            .iter()
+            .any(|stage| stage.meta.rule_set == RuleSet::Trap));
+    }
+
+    #[test]
+    fn first_window_stages_have_required_metadata() {
+        for stage in demo_stages() {
+            assert!(!stage.meta.id.is_empty());
+            assert!(!stage.meta.name.is_empty());
+            assert!(stage.meta.turn_limit.is_some());
+            assert!(!stage.meta.hint.is_empty());
+            assert!(!stage.meta.gimmick.is_empty());
+            assert_eq!(stage.meta.goal_type, GoalType::Reach);
+        }
     }
 
     #[cfg(feature = "pixel_tile")]

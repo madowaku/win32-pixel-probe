@@ -2,6 +2,17 @@
 
 MadoCore 144 is a tiny Rust game core for 1.44 MB game contests. It is not a Unity, Godot, Defold, or GDevelop replacement. It is a small starting point for single-file executable games that keep stages, pixel data, and sound data in code.
 
+## FIRST WINDOW
+
+FIRST WINDOW is the first complete puzzle game built with MadoCore 144.
+
+Concept: inside a tiny 1.44 MB window, read keys, ice, and traps, then reach the goal.
+
+- 20 one-screen stages.
+- Rules use only the existing `classic`, `keydoor`, `ice`, and `trap` hooks.
+- Stage order: classic introduction, key-door puzzles, ice puzzles, trap puzzles, and a short finale.
+- No external crates, images, sound files, or data files.
+
 ## Features
 
 - Windows-friendly terminal demo game.
@@ -11,7 +22,7 @@ MadoCore 144 is a tiny Rust game core for 1.44 MB game contests. It is not a Uni
 - Built-in input commands: `WASD`, arrow-key escape sequences when available, Enter, Esc, `R`, `H`, `U`, `Q`.
 - Scenes: Title, Help, Game, Clear, GameOver.
 - Grid game structures: `Tile`, `Pos`, `GameState`, `Stage`, `Direction`.
-- Nine built-in Stage Pack puzzle stages covering classic, keydoor, ice, and trap rules.
+- FIRST WINDOW includes 20 built-in Stage Pack puzzle stages covering classic, keydoor, ice, and trap rules.
 - Undo and reset.
 - v0.2 Pixel Layer skeleton: 160x144 indexed buffer, 16-color palette, 8x8 tile draw, 16x16 sprite draw, tilemap draw, compact square-wave/MML-style sound data.
 - v0.4 Stage Pack metadata: stage id, name, goal type, turn limit, hint, gimmick label, and per-stage tile meanings.
@@ -93,6 +104,17 @@ MadoCore 144 v0.5 Rule Hooks size log:
 | `asset_sound` | `132,096 bytes` | `1,342,464 bytes` | `8.96%` |
 | v0.5 default all capacity assets | `143,360 bytes` | `1,331,200 bytes` | `9.72%` |
 
+FIRST WINDOW v0.1 size log:
+
+| Case | Release exe size | Remaining | Used |
+| --- | ---: | ---: | ---: |
+| core pixel+sound, no capacity assets | `135,680 bytes` | `1,338,880 bytes` | `9.20%` |
+| `asset_tiles` | `139,776 bytes` | `1,334,784 bytes` | `9.48%` |
+| `asset_sprites` | `139,776 bytes` | `1,334,784 bytes` | `9.48%` |
+| `asset_maps` | `138,752 bytes` | `1,335,808 bytes` | `9.41%` |
+| `asset_sound` | `136,192 bytes` | `1,338,368 bytes` | `9.24%` |
+| FIRST WINDOW default all capacity assets | `147,456 bytes` | `1,327,104 bytes` | `10.00%` |
+
 ## Stage Pack Format
 
 Stages are Rust string constants. Metadata lines begin with `@`, then a blank line separates metadata from the grid.
@@ -131,6 +153,8 @@ Rule hook behavior:
 - `keydoor`: `Key` sets `has_key`; `Door` blocks movement until the key is held.
 - `ice`: entering `Ice` slides the player until a wall or obstacle would be hit.
 - `trap`: entering `Trap` sets `trapped` and enters GameOver.
+
+FIRST WINDOW uses the same format for its 20 built-in stages. It does not add new engine rules.
 
 Example key-door stage:
 

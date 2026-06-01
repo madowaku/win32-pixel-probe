@@ -25,7 +25,7 @@ $cases = @(
         Args = @("build", "--release", "--no-default-features", "--features", "pixel_tile,asset_sound")
     },
     @{
-        Name = "v0_5_default_all_capacity_assets"
+        Name = "first_window_v0_1_default_all_assets"
         Args = @("build", "--release")
     }
 )

@@ -86,6 +86,18 @@ Movement is split into small match-based hooks:
 
 This keeps game-specific behavior replaceable without a trait hierarchy or a large engine abstraction. `Snapshot` stores the rule flags so `undo` and `reset` restore `has_key` and `trapped`.
 
+## FIRST WINDOW v0.1
+
+FIRST WINDOW is the first game built with MadoCore 144. It uses the v0.5 Rule Hooks and Stage Pack format as-is: no new engine rules, no external assets, and no external data files.
+
+The game contains 20 one-screen stages:
+
+- 01-04: classic introduction.
+- 05-08: key-door puzzles.
+- 09-13: ice puzzles.
+- 14-17: trap puzzles.
+- 18-20: finale stages that reuse the same single-rule hook model.
+
 ## Size Strategy
 
 The release profile uses:
