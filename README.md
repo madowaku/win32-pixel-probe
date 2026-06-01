@@ -35,6 +35,16 @@ Remaining: 1,361,920 bytes
 
 That means a native Win32 pixel window is comfortably inside the 1.44 MB target. This project can now grow as a small Win32 game template without forcing `unsafe` FFI into the stable MadoCore terminal repo.
 
+## v0.2 Input & Game Loop Probe
+
+v0.2 adds the first tiny game-loop layer on top of the v0.1.0 window baseline.
+
+- The Win32 timer fires every 16 ms, giving a simple 60Hz-ish tick.
+- Held input state is tracked for arrow keys and `W`, `A`, `S`, `D`.
+- A small 16x16 sprite moves one pixel per tick and clamps at the 160x144 layer edges.
+- The window title reports `win32-pixel-probe v0.2`, layer size, tick style, and the current tick count.
+- Rendering still uses the same indexed `PixelLayer` to 32-bit BGRA to `StretchDIBits` path.
+
 ## MadoCore Origin
 
 MadoCore 144 is a tiny Rust game core for 1.44 MB game contests. It is not a Unity, Godot, Defold, or GDevelop replacement. It is a small starting point for single-file executable games that keep stages, pixel data, and sound data in code.
@@ -92,7 +102,7 @@ To run the experimental Win32 pixel window:
 cargo run --release --features win32_pixel
 ```
 
-Use Esc or the window close button to quit. Arrow keys move the demo sprite.
+Use Esc or the window close button to quit. Arrow keys or `W`, `A`, `S`, `D` move the demo sprite while held.
 
 ## Size Check
 
@@ -168,6 +178,12 @@ MadoCore 144 v0.6 Win32 Pixel Probe size log:
 | v0.6 Win32 Pixel Probe (`--features win32_pixel`) | `112,640 bytes` | `1,361,920 bytes` | `7.64%` |
 
 The probe is an experiment, not the FIRST WINDOW game port. It keeps the terminal game as the normal build and switches to a native Win32 window only when the `win32_pixel` feature is enabled. The window path uses Rust standard library plus handwritten FFI to `user32.dll` and `gdi32.dll`, creates a 160x144 indexed `PixelLayer`, converts the 16-color palette to 32-bit BGRA, and presents it with `StretchDIBits` at 4x scale. The demo draws a checker background, a few 8x8 tiles, and a moving sprite.
+
+win32-pixel-probe v0.2 Input & Game Loop Probe size log:
+
+| Case | Release exe size | Remaining | Used |
+| --- | ---: | ---: | ---: |
+| v0.2 Input & Game Loop Probe (`--features win32_pixel`) | `112,640 bytes` | `1,361,920 bytes` | `7.64%` |
 
 ## Stage Pack Format
 

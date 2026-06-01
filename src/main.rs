@@ -740,12 +740,73 @@ struct ProbeInput {
 }
 
 #[cfg(feature = "win32_pixel")]
+const PROBE_LAYER_WIDTH: usize = 160;
+#[cfg(feature = "win32_pixel")]
+const PROBE_LAYER_HEIGHT: usize = 144;
+#[cfg(feature = "win32_pixel")]
+const PROBE_SPRITE_SIZE: usize = 16;
+#[cfg(feature = "win32_pixel")]
+const PROBE_TICK_HZ_LABEL: &str = "60Hz-ish tick";
+
+#[cfg(feature = "win32_pixel")]
+struct ProbeGame {
+    sprite_x: usize,
+    sprite_y: usize,
+    tick_count: u32,
+}
+
+#[cfg(feature = "win32_pixel")]
+impl ProbeGame {
+    fn new() -> Self {
+        Self {
+            sprite_x: 72,
+            sprite_y: 60,
+            tick_count: 0,
+        }
+    }
+
+    fn tick(&mut self, input: ProbeInput) {
+        self.tick_count = self.tick_count.wrapping_add(1);
+        self.sprite_x = step_axis(self.sprite_x, input.left, input.right, PROBE_LAYER_WIDTH);
+        self.sprite_y = step_axis(self.sprite_y, input.up, input.down, PROBE_LAYER_HEIGHT);
+    }
+
+    fn title(&self) -> String {
+        format!(
+            "win32-pixel-probe v0.2 | {}x{} | {} | tick {}",
+            PROBE_LAYER_WIDTH, PROBE_LAYER_HEIGHT, PROBE_TICK_HZ_LABEL, self.tick_count
+        )
+    }
+}
+
+#[cfg(feature = "win32_pixel")]
+fn step_axis(value: usize, negative: bool, positive: bool, limit: usize) -> usize {
+    let max = limit.saturating_sub(PROBE_SPRITE_SIZE);
+    if positive && !negative {
+        value.saturating_add(1).min(max)
+    } else if negative && !positive {
+        value.saturating_sub(1).min(max)
+    } else {
+        value.min(max)
+    }
+}
+
+#[cfg(feature = "win32_pixel")]
 fn render_win32_probe_frame(layer: &mut PixelLayer, frame: u32, input: ProbeInput) {
+    let mut game = ProbeGame::new();
+    game.tick_count = frame;
+    game.sprite_x = step_axis(game.sprite_x, input.left, input.right, PROBE_LAYER_WIDTH);
+    game.sprite_y = step_axis(game.sprite_y, input.up, input.down, PROBE_LAYER_HEIGHT);
+    render_probe_scene(layer, &game);
+}
+
+#[cfg(feature = "win32_pixel")]
+fn render_probe_scene(layer: &mut PixelLayer, game: &ProbeGame) {
     layer.clear(0);
 
     for y in 0..layer.height {
         for x in 0..layer.width {
-            let block = ((x / 8) + (y / 8)) & 1;
+            let block = ((x / 8) + (y / 8) + (game.tick_count as usize / 30)) & 1;
             layer.set_pixel(x, y, if block == 0 { 1 } else { 2 });
         }
     }
@@ -769,30 +830,12 @@ fn render_win32_probe_frame(layer: &mut PixelLayer, frame: u32, input: ProbeInpu
         }
     }
 
-    let base_x = 72 + (frame as usize / 4 % 16);
-    let base_y = 60 + (frame as usize / 6 % 12);
-    let input_x = if input.right {
-        4
-    } else if input.left {
-        usize::MAX - 3
-    } else {
-        0
-    };
-    let input_y = if input.down {
-        4
-    } else if input.up {
-        usize::MAX - 3
-    } else {
-        0
-    };
-    let x = base_x.wrapping_add(input_x).min(layer.width - 16);
-    let y = base_y.wrapping_add(input_y).min(layer.height - 16);
-    layer.draw_sprite(x, y, &sprite, 0);
+    layer.draw_sprite(game.sprite_x, game.sprite_y, &sprite, 0);
 }
 
 #[cfg(all(feature = "win32_pixel", windows))]
 mod win32_pixel {
-    use super::{render_win32_probe_frame, PixelLayer, ProbeInput};
+    use super::{PixelLayer, ProbeInput};
     use std::ffi::c_void;
     use std::io;
     use std::mem::{size_of, zeroed};
@@ -813,8 +856,8 @@ mod win32_pixel {
     type Long = i32;
     type Bool = i32;
 
-    const WIDTH: usize = 160;
-    const HEIGHT: usize = 144;
+    const WIDTH: usize = super::PROBE_LAYER_WIDTH;
+    const HEIGHT: usize = super::PROBE_LAYER_HEIGHT;
     const SCALE: i32 = 4;
     const TIMER_ID: usize = 1;
     const TIMER_MS: u32 = 16;
@@ -838,6 +881,10 @@ mod win32_pixel {
     const VK_UP: Wparam = 0x26;
     const VK_RIGHT: Wparam = 0x27;
     const VK_DOWN: Wparam = 0x28;
+    const VK_A: Wparam = 0x41;
+    const VK_D: Wparam = 0x44;
+    const VK_S: Wparam = 0x53;
+    const VK_W: Wparam = 0x57;
 
     const BI_RGB: Dword = 0;
     const DIB_RGB_COLORS: Uint = 0;
@@ -924,7 +971,7 @@ mod win32_pixel {
         layer: PixelLayer,
         bgra: Vec<u32>,
         input: ProbeInput,
-        frame: u32,
+        game: super::ProbeGame,
     }
 
     impl ProbeWindow {
@@ -933,14 +980,18 @@ mod win32_pixel {
                 layer: PixelLayer::new(WIDTH, HEIGHT),
                 bgra: vec![0; WIDTH * HEIGHT],
                 input: ProbeInput::default(),
-                frame: 0,
+                game: super::ProbeGame::new(),
             }
         }
 
         fn update(&mut self) {
-            render_win32_probe_frame(&mut self.layer, self.frame, self.input);
+            self.game.tick(self.input);
+            super::render_probe_scene(&mut self.layer, &self.game);
             self.layer.write_bgra(&mut self.bgra);
-            self.frame = self.frame.wrapping_add(1);
+        }
+
+        fn title(&self) -> Vec<u16> {
+            wide(&self.game.title())
         }
     }
 
@@ -972,6 +1023,7 @@ mod win32_pixel {
         fn LoadCursorW(h_instance: Hinstance, lp_cursor_name: Lpcwstr) -> Hcursor;
         fn PostQuitMessage(exit_code: i32);
         fn SetTimer(hwnd: Hwnd, id_event: usize, elapse: Uint, timer_func: *mut c_void) -> usize;
+        fn SetWindowTextW(hwnd: Hwnd, lp_string: Lpcwstr) -> Bool;
         fn ShowWindow(hwnd: Hwnd, n_cmd_show: i32) -> Bool;
         fn TranslateMessage(lp_msg: *const Msg) -> Bool;
         fn UpdateWindow(hwnd: Hwnd) -> Bool;
@@ -999,10 +1051,10 @@ mod win32_pixel {
     }
 
     pub fn run() -> io::Result<()> {
-        let class_name = wide("MadoCore144Win32PixelProbe");
-        let title = wide("MadoCore 144 v0.6 Win32 Pixel Probe");
+        let class_name = wide("Win32PixelProbe");
         let mut state = Box::new(ProbeWindow::new());
         state.update();
+        let title = state.title();
 
         unsafe {
             PROBE_WINDOW = state.as_mut();
@@ -1042,7 +1094,9 @@ mod win32_pixel {
                 return Err(io::Error::last_os_error());
             }
 
-            SetTimer(hwnd, TIMER_ID, TIMER_MS, null_mut());
+            if SetTimer(hwnd, TIMER_ID, TIMER_MS, null_mut()) == 0 {
+                return Err(io::Error::last_os_error());
+            }
             ShowWindow(hwnd, SW_SHOW);
             UpdateWindow(hwnd);
 
@@ -1080,10 +1134,10 @@ mod win32_pixel {
                 if let Some(state) = PROBE_WINDOW.as_mut() {
                     let pressed = msg == WM_KEYDOWN;
                     match w_param {
-                        VK_LEFT => state.input.left = pressed,
-                        VK_RIGHT => state.input.right = pressed,
-                        VK_UP => state.input.up = pressed,
-                        VK_DOWN => state.input.down = pressed,
+                        VK_LEFT | VK_A => state.input.left = pressed,
+                        VK_RIGHT | VK_D => state.input.right = pressed,
+                        VK_UP | VK_W => state.input.up = pressed,
+                        VK_DOWN | VK_S => state.input.down = pressed,
                         _ => {}
                     }
                 }
@@ -1092,6 +1146,8 @@ mod win32_pixel {
             WM_TIMER => {
                 if let Some(state) = PROBE_WINDOW.as_mut() {
                     state.update();
+                    let title = state.title();
+                    SetWindowTextW(hwnd, title.as_ptr());
                 }
                 InvalidateRect(hwnd, null(), 0);
                 0
@@ -2235,6 +2291,53 @@ mod tests {
             },
         );
         assert_eq!(layer.pixel(82, 70), 15);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_game_tick_moves_held_input_once_per_tick() {
+        let mut game = ProbeGame::new();
+        game.tick(ProbeInput {
+            right: true,
+            down: true,
+            ..ProbeInput::default()
+        });
+        game.tick(ProbeInput {
+            right: true,
+            down: true,
+            ..ProbeInput::default()
+        });
+        assert_eq!(game.tick_count, 2);
+        assert_eq!(game.sprite_x, 74);
+        assert_eq!(game.sprite_y, 62);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_game_clamps_sprite_to_screen_edges() {
+        let mut game = ProbeGame {
+            sprite_x: 159,
+            sprite_y: 143,
+            tick_count: 0,
+        };
+        game.tick(ProbeInput {
+            right: true,
+            down: true,
+            ..ProbeInput::default()
+        });
+        assert_eq!(game.sprite_x, 144);
+        assert_eq!(game.sprite_y, 128);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_game_title_reports_tick_and_timer() {
+        let mut game = ProbeGame::new();
+        game.tick(ProbeInput::default());
+        assert_eq!(
+            game.title(),
+            "win32-pixel-probe v0.2 | 160x144 | 60Hz-ish tick | tick 1"
+        );
     }
 
     #[cfg(feature = "pixel_tile")]

@@ -136,6 +136,18 @@ Risk notes:
 - The terminal game remains the stable path if the window experiment becomes too complex.
 - The next decision should be based on release size, code readability, and whether FIRST WINDOW can reuse this path without turning the core into a Win32 framework.
 
+## win32-pixel-probe v0.2 Input & Game Loop Probe
+
+The separate probe repo now owns the first game-loop experiment:
+
+- A Win32 timer runs at 16 ms per event, which is treated as a simple 60Hz-ish tick source.
+- `ProbeInput` stores held direction flags. Win32 key messages map both arrow keys and `WASD` into those flags.
+- `ProbeGame` is safe Rust state outside the FFI module. It owns the sprite position and tick count.
+- Each tick moves the sprite one pixel per axis and clamps it inside the 160x144 layer.
+- The window title is refreshed from safe state and shows the version, layer size, tick style, and tick count.
+
+This keeps the Win32 module focused on message handling, title updates, and `StretchDIBits`, while movement rules stay testable without opening a window.
+
 ## Size Strategy
 
 The release profile uses:
