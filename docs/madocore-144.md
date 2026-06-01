@@ -49,6 +49,43 @@ The Capacity Demo adds feature-gated dummy assets that are referenced by `main` 
 
 Use `powershell ./size.ps1` to build and measure the base core, each asset group, and the default all-assets build.
 
+## v0.4 Stage Pack
+
+The Stage Pack turns code-embedded stage strings into a compact authoring format. A stage can define:
+
+- `@stage`: id.
+- `@name`: display name.
+- `@goal reach`: goal type.
+- `@limit`: turn limit.
+- `@hint`: player-facing hint.
+- `@gimmick`: a short design label.
+- `@tile <char> wall` or `@tile <char> floor`: per-stage tile meanings.
+
+The parser still keeps the old `Stage::parse(&[...])` helper for tiny tests and experiments. The demo uses `Stage::parse_pack()` and includes nine stages after the v0.5 Rule Hooks examples.
+
+Turns are counted only for successful movement. Wall bumps do not consume turns. If movement makes the counter greater than the stage limit, the scene becomes `GameOver`. `undo` and `reset` restore the move counter and scene state.
+
+## v0.5 Rule Hooks
+
+Rule Hooks add a small `RuleSet` field to `StageMeta`:
+
+- `classic`: the original reach-the-goal rule.
+- `keydoor`: `Key` sets `has_key`; `Door` requires `has_key`.
+- `ice`: entering `Ice` slides until the next step would hit a wall or blocked tile.
+- `trap`: entering `Trap` sets `trapped` and changes the scene to `GameOver`.
+
+The tile enum now represents simple effects: `Floor`, `Wall`, `Goal`, `Key`, `Door`, `Ice`, and `Trap`. Stage packs can map characters with `@tile <char> floor|wall|goal|key|door|ice|trap`.
+
+Movement is split into small match-based hooks:
+
+- `can_enter_tile()`
+- `on_enter_tile()`
+- `after_move()`
+- `check_clear()`
+- `check_game_over()`
+
+This keeps game-specific behavior replaceable without a trait hierarchy or a large engine abstraction. `Snapshot` stores the rule flags so `undo` and `reset` restore `has_key` and `trapped`.
+
 ## Size Strategy
 
 The release profile uses:
