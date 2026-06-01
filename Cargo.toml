@@ -1,0 +1,27 @@
+[package]
+name = "madocore144"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = [
+    "pixel_tile",
+    "pixel_sound",
+    "asset_tiles",
+    "asset_sprites",
+    "asset_maps",
+    "asset_sound",
+]
+pixel_tile = []
+pixel_sound = []
+asset_tiles = ["pixel_tile"]
+asset_sprites = ["pixel_tile"]
+asset_maps = ["pixel_tile"]
+asset_sound = ["pixel_sound"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
