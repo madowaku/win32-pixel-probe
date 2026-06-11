@@ -29,7 +29,7 @@ $cases = @(
         Args = @("build", "--release")
     },
     @{
-        Name = "v0_2_input_game_loop_probe"
+        Name = "v0_3_tilemap_camera_probe"
         Args = @("build", "--release", "--features", "win32_pixel")
     }
 )

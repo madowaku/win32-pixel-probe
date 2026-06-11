@@ -24,16 +24,28 @@ madowaku/win32-pixel-probe
 
 ## Probe Result
 
-The first probe is a success:
+Current probe status:
 
 ```text
-Win32 Pixel Probe
-112,640 bytes
-7.64%
-Remaining: 1,361,920 bytes
+win32-pixel-probe v0.3
+Tilemap & Camera Probe
+no external crates
+hand-written Win32 FFI
+160x144 PixelLayer
+StretchDIBits
 ```
 
-That means a native Win32 pixel window is comfortably inside the 1.44 MB target. This project can now grow as a small Win32 game template without forcing `unsafe` FFI into the stable MadoCore terminal repo.
+The native Win32 pixel window is comfortably inside the 1.44 MB target. This project can now grow as a small Win32 game template without forcing `unsafe` FFI into the stable MadoCore terminal repo.
+
+## v0.3 Tilemap & Camera Probe
+
+v0.3 turns the moving-window probe into a tiny readable game screen.
+
+- Draws a tilemap world with floor, wall, and goal tiles.
+- Adds a compact non-font HUD strip for tick pulse and camera position.
+- Moves a 16x16 sprite over the tilemap with wall collision.
+- Adds a small horizontal camera offset over a world wider than the viewport.
+- Keeps sprite, map, HUD, and collision behavior in testable safe Rust outside the Win32 FFI module.
 
 ## v0.2 Input & Game Loop Probe
 
@@ -184,6 +196,12 @@ win32-pixel-probe v0.2 Input & Game Loop Probe size log:
 | Case | Release exe size | Remaining | Used |
 | --- | ---: | ---: | ---: |
 | v0.2 Input & Game Loop Probe (`--features win32_pixel`) | `112,640 bytes` | `1,361,920 bytes` | `7.64%` |
+
+win32-pixel-probe v0.3 Tilemap & Camera Probe size log:
+
+| Case | Release exe size | Remaining | Used |
+| --- | ---: | ---: | ---: |
+| v0.3 Tilemap & Camera Probe (`--features win32_pixel`) | `113,664 bytes` | `1,360,896 bytes` | `7.71%` |
 
 ## Stage Pack Format
 

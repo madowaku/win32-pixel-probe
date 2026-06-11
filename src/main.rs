@@ -747,12 +747,33 @@ const PROBE_LAYER_HEIGHT: usize = 144;
 const PROBE_SPRITE_SIZE: usize = 16;
 #[cfg(feature = "win32_pixel")]
 const PROBE_TICK_HZ_LABEL: &str = "60Hz-ish tick";
+#[cfg(feature = "win32_pixel")]
+const PROBE_TILE_SIZE: usize = 8;
+#[cfg(feature = "win32_pixel")]
+const PROBE_MAP_WIDTH: usize = 21;
+#[cfg(feature = "win32_pixel")]
+const PROBE_MAP_HEIGHT: usize = 18;
 
 #[cfg(feature = "win32_pixel")]
 struct ProbeGame {
     sprite_x: usize,
     sprite_y: usize,
     tick_count: u32,
+}
+
+#[cfg(feature = "win32_pixel")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ProbeCamera {
+    x: usize,
+    y: usize,
+}
+
+#[cfg(feature = "win32_pixel")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProbeTile {
+    Floor,
+    Wall,
+    Goal,
 }
 
 #[cfg(feature = "win32_pixel")]
@@ -767,14 +788,44 @@ impl ProbeGame {
 
     fn tick(&mut self, input: ProbeInput) {
         self.tick_count = self.tick_count.wrapping_add(1);
-        self.sprite_x = step_axis(self.sprite_x, input.left, input.right, PROBE_LAYER_WIDTH);
-        self.sprite_y = step_axis(self.sprite_y, input.up, input.down, PROBE_LAYER_HEIGHT);
+        self.sprite_x = self.sprite_x.min(probe_walk_width() - PROBE_SPRITE_SIZE);
+        self.sprite_y = self.sprite_y.min(probe_walk_height() - PROBE_SPRITE_SIZE);
+        let next_x = step_axis(self.sprite_x, input.left, input.right, probe_walk_width());
+        let next_y = step_axis(self.sprite_y, input.up, input.down, probe_walk_height());
+        if !probe_hits_wall(next_x, self.sprite_y) {
+            self.sprite_x = next_x;
+        }
+        if !probe_hits_wall(self.sprite_x, next_y) {
+            self.sprite_y = next_y;
+        }
+    }
+
+    fn camera(&self) -> ProbeCamera {
+        ProbeCamera {
+            x: camera_axis(
+                self.sprite_x,
+                PROBE_LAYER_WIDTH,
+                probe_world_width(),
+                PROBE_SPRITE_SIZE,
+            ),
+            y: camera_axis(
+                self.sprite_y,
+                PROBE_LAYER_HEIGHT,
+                probe_world_height(),
+                PROBE_SPRITE_SIZE,
+            ),
+        }
     }
 
     fn title(&self) -> String {
         format!(
-            "win32-pixel-probe v0.2 | {}x{} | {} | tick {}",
-            PROBE_LAYER_WIDTH, PROBE_LAYER_HEIGHT, PROBE_TICK_HZ_LABEL, self.tick_count
+            "win32-pixel-probe v0.3 | {}x{} | {} | pos {},{} | tick {}",
+            PROBE_LAYER_WIDTH,
+            PROBE_LAYER_HEIGHT,
+            PROBE_TICK_HZ_LABEL,
+            self.sprite_x,
+            self.sprite_y,
+            self.tick_count
         )
     }
 }
@@ -792,28 +843,113 @@ fn step_axis(value: usize, negative: bool, positive: bool, limit: usize) -> usiz
 }
 
 #[cfg(feature = "win32_pixel")]
+fn camera_axis(sprite: usize, viewport: usize, world: usize, sprite_size: usize) -> usize {
+    if world <= viewport {
+        return 0;
+    }
+    let center = sprite.saturating_add(sprite_size / 2);
+    center
+        .saturating_sub(viewport / 2)
+        .min(world.saturating_sub(viewport))
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_world_width() -> usize {
+    PROBE_MAP_WIDTH * PROBE_TILE_SIZE
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_world_height() -> usize {
+    PROBE_MAP_HEIGHT * PROBE_TILE_SIZE
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_walk_width() -> usize {
+    probe_world_width().saturating_sub(PROBE_TILE_SIZE)
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_walk_height() -> usize {
+    probe_world_height().saturating_sub(PROBE_TILE_SIZE)
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_tile_at(tx: usize, ty: usize) -> ProbeTile {
+    if tx >= PROBE_MAP_WIDTH || ty >= PROBE_MAP_HEIGHT {
+        return ProbeTile::Wall;
+    }
+    if tx == 17 && ty == 16 {
+        return ProbeTile::Goal;
+    }
+    if tx == 0
+        || ty == 0
+        || tx + 1 == PROBE_MAP_WIDTH
+        || ty + 1 == PROBE_MAP_HEIGHT
+        || (ty == 2 && (tx == 1 || tx == 2 || tx == 3))
+        || (tx == 7 && (4..=13).contains(&ty))
+        || (ty == 10 && (9..=16).contains(&tx))
+        || (tx == 15 && (3..=7).contains(&ty))
+    {
+        ProbeTile::Wall
+    } else {
+        ProbeTile::Floor
+    }
+}
+
+#[cfg(feature = "win32_pixel")]
+fn probe_hits_wall(x: usize, y: usize) -> bool {
+    let right = x + PROBE_SPRITE_SIZE - 1;
+    let bottom = y + PROBE_SPRITE_SIZE - 1;
+    let points = [(x, y), (right, y), (x, bottom), (right, bottom)];
+    points.iter().any(|(px, py)| {
+        matches!(
+            probe_tile_at(px / PROBE_TILE_SIZE, py / PROBE_TILE_SIZE),
+            ProbeTile::Wall
+        )
+    })
+}
+
+#[cfg(feature = "win32_pixel")]
 fn render_win32_probe_frame(layer: &mut PixelLayer, frame: u32, input: ProbeInput) {
     let mut game = ProbeGame::new();
     game.tick_count = frame;
-    game.sprite_x = step_axis(game.sprite_x, input.left, input.right, PROBE_LAYER_WIDTH);
-    game.sprite_y = step_axis(game.sprite_y, input.up, input.down, PROBE_LAYER_HEIGHT);
+    game.tick(input);
     render_probe_scene(layer, &game);
 }
 
 #[cfg(feature = "win32_pixel")]
 fn render_probe_scene(layer: &mut PixelLayer, game: &ProbeGame) {
     layer.clear(0);
+    let camera = game.camera();
 
     for y in 0..layer.height {
         for x in 0..layer.width {
-            let block = ((x / 8) + (y / 8) + (game.tick_count as usize / 30)) & 1;
-            layer.set_pixel(x, y, if block == 0 { 1 } else { 2 });
+            let wx = x + camera.x;
+            let wy = y + camera.y;
+            let tx = wx / PROBE_TILE_SIZE;
+            let ty = wy / PROBE_TILE_SIZE;
+            let color = match probe_tile_at(tx, ty) {
+                ProbeTile::Wall => 13,
+                ProbeTile::Goal => {
+                    if (game.tick_count / 12) & 1 == 0 {
+                        6
+                    } else {
+                        15
+                    }
+                }
+                ProbeTile::Floor => {
+                    if ((tx + ty) & 1) == 0 {
+                        1
+                    } else {
+                        2
+                    }
+                }
+            };
+            layer.set_pixel(x, y, color);
         }
     }
 
-    const TILES: [[u8; 64]; 4] = [[4; 64], [5; 64], [6; 64], [10; 64]];
-    const MAP: [u8; 12] = [0, 1, 2, 3, 1, 2, 3, 0, 2, 3, 0, 1];
-    layer.draw_tilemap(16, 16, &MAP, 4, &TILES);
+    draw_probe_hud(layer, game);
 
     let mut sprite = [0u8; 256];
     for y in 0..16 {
@@ -830,7 +966,35 @@ fn render_probe_scene(layer: &mut PixelLayer, game: &ProbeGame) {
         }
     }
 
-    layer.draw_sprite(game.sprite_x, game.sprite_y, &sprite, 0);
+    layer.draw_sprite(
+        game.sprite_x.saturating_sub(camera.x),
+        game.sprite_y.saturating_sub(camera.y),
+        &sprite,
+        0,
+    );
+}
+
+#[cfg(feature = "win32_pixel")]
+fn draw_probe_hud(layer: &mut PixelLayer, game: &ProbeGame) {
+    for y in 0..16 {
+        for x in 0..layer.width {
+            layer.set_pixel(x, y, if y == 15 { 14 } else { 12 });
+        }
+    }
+
+    let pulse = ((game.tick_count / 8) & 7) as usize;
+    for i in 0..8 {
+        let color = if i <= pulse { 6 } else { 13 };
+        for y in 4..12 {
+            layer.set_pixel(8 + i * 5, y, color);
+        }
+    }
+
+    let camera = game.camera();
+    let marker_x = 128 + (camera.x * 24 / (probe_world_width() - PROBE_LAYER_WIDTH).max(1));
+    for y in 5..11 {
+        layer.set_pixel(marker_x.min(PROBE_LAYER_WIDTH - 1), y, 10);
+    }
 }
 
 #[cfg(all(feature = "win32_pixel", windows))]
@@ -2271,9 +2435,9 @@ mod tests {
     fn win32_probe_frame_draws_checker_tiles_and_sprite() {
         let mut layer = PixelLayer::new(160, 144);
         render_win32_probe_frame(&mut layer, 0, ProbeInput::default());
-        assert_eq!(layer.pixel(0, 0), 1);
-        assert_eq!(layer.pixel(8, 0), 2);
-        assert_eq!(layer.pixel(24, 24), 6);
+        assert_eq!(layer.pixel(0, 0), 12);
+        assert_eq!(layer.pixel(8, 16), 13);
+        assert_eq!(layer.pixel(136, 128), 6);
         assert_eq!(layer.pixel(78, 66), 15);
     }
 
@@ -2290,7 +2454,7 @@ mod tests {
                 ..ProbeInput::default()
             },
         );
-        assert_eq!(layer.pixel(82, 70), 15);
+        assert_eq!(layer.pixel(79, 67), 15);
     }
 
     #[cfg(feature = "win32_pixel")]
@@ -2326,7 +2490,7 @@ mod tests {
             ..ProbeInput::default()
         });
         assert_eq!(game.sprite_x, 144);
-        assert_eq!(game.sprite_y, 128);
+        assert_eq!(game.sprite_y, 120);
     }
 
     #[cfg(feature = "win32_pixel")]
@@ -2336,8 +2500,45 @@ mod tests {
         game.tick(ProbeInput::default());
         assert_eq!(
             game.title(),
-            "win32-pixel-probe v0.2 | 160x144 | 60Hz-ish tick | tick 1"
+            "win32-pixel-probe v0.3 | 160x144 | 60Hz-ish tick | pos 72,60 | tick 1"
         );
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_game_blocks_wall_tiles() {
+        let mut game = ProbeGame::new();
+        game.sprite_x = 8;
+        game.sprite_y = 16;
+        game.tick(ProbeInput {
+            left: true,
+            ..ProbeInput::default()
+        });
+        assert_eq!(game.sprite_x, 8);
+        assert_eq!(game.sprite_y, 16);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_camera_tracks_sprite_inside_tilemap() {
+        let mut game = ProbeGame::new();
+        game.sprite_x = 132;
+        game.sprite_y = 104;
+        let camera = game.camera();
+        assert_eq!(camera.x, 8);
+        assert_eq!(camera.y, 0);
+    }
+
+    #[cfg(feature = "win32_pixel")]
+    #[test]
+    fn probe_scene_draws_hud_world_and_goal() {
+        let mut layer = PixelLayer::new(160, 144);
+        let game = ProbeGame::new();
+        render_probe_scene(&mut layer, &game);
+        assert_eq!(layer.pixel(0, 0), 12);
+        assert_eq!(layer.pixel(8, 16), 13);
+        assert_eq!(layer.pixel(136, 128), 6);
+        assert_eq!(layer.pixel(game.sprite_x + 6, game.sprite_y + 6), 15);
     }
 
     #[cfg(feature = "pixel_tile")]

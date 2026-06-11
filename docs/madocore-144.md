@@ -148,6 +148,18 @@ The separate probe repo now owns the first game-loop experiment:
 
 This keeps the Win32 module focused on message handling, title updates, and `StretchDIBits`, while movement rules stay testable without opening a window.
 
+## win32-pixel-probe v0.3 Tilemap & Camera Probe
+
+The probe now has enough visual structure to read as a game screen instead of a framebuffer demo:
+
+- The world is a small 8x8 tilemap made from code, with floor, walls, and a goal tile.
+- The viewport remains 160x144, while the world is slightly wider so the camera can pan horizontally.
+- A compact HUD strip uses palette blocks instead of text rendering, preserving the no-font/no-asset direction.
+- The sprite moves over the tilemap and collision prevents it from entering wall tiles.
+- The window title carries the verbose status: version, layer size, tick style, sprite position, and tick count.
+
+This is the first point where the probe feels like a tiny game template: Win32 owns the window and input messages, while safe Rust owns state, collision, camera, and rendering decisions.
+
 ## Size Strategy
 
 The release profile uses:
